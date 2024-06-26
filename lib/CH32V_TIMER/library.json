@@ -1,0 +1,21 @@
+{
+    "name": "ch32v-timer",
+    "version": "0.1.0",
+    "description": "A library for initializing basic timers and reading systick global time on CH32V/X MCUs.",
+    "keywords": "ch32v, systick, timer",
+    "repository":
+    {
+      "type": "git",
+      "url": "https://github.com/KingKoro/CH32VX-TIMER-PIO-Library.git"
+    },
+    "authors":
+    {
+        "name": "Florian Korotschenko",
+        "email": "Florian.Korotschenko1@web.de",
+        "url": "https://github.com/KingKoro",
+        "maintainer": true
+    },
+    "license": "MIT",
+    "frameworks": ["noneos-sdk", "arduino"],
+    "platforms": "ch32v"
+}
