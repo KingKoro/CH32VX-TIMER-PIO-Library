@@ -9,21 +9,23 @@
         An Example for this issue:
         ```C
         // 96000000 / (96000000 / 4 / 1250) / (4 + 1) = 1kHz Output (precisely 1kHz)
-        basic_timer_init(TCONF_TIM3, 1250, TCONF_IRQ, 4);
+        basic_timer_init(TCONF_TIM3, 1250, TCONF_IRQ, my_function, 4);
         // 96000000 / (96000000 / 254 / 1004) / (254 + 1) = ~1kHz Output (actually 1000.0627451 Hz, measured 998,6 Hz)
-        basic_timer_init(TCONF_TIM3, 1006, TCONF_IRQ);
+        basic_timer_init(TCONF_TIM3, 1006, TCONF_IRQ, my_function);
         ```
 - When initializing a PWM output on an already initialized timer, the timer prescaler and counter are overwritten, therefore the timer's frequency might change as well.
     An Example for this issue:
     ```C
     // 96000000 / (96000000 / 254 / 1004) / (254 + 1) = ~1kHz Output
-    basic_timer_init(TCONF_TIM3, 1006, TCONF_IRQ);
+    basic_timer_init(TCONF_TIM3, 1004, TCONF_IRQ, my_function);
     // initialize PWM on PA6 (TIM3_CH1) with ~2kHz Base frequency -> This overwrites the 1kHz Base Frequency from the previous Timer 3 Initialization!
     PWM_handle PWM_A6={0};
     init_pwm(&PWM_A6, PWM_TIM3, PWM_CH1, 0xA6, 2000);
     set_pwm_dutycycle(&PWM_A6, 200);              // set  PWM duty cycle to 200/255 initially
     enable_pwm_output(&PWM_A6);                 // start PWM output
     ```
+## Warning
+If your project is also utilizing my [CH32V/X USB-Serial Library](https://github.com/KingKoro/CH32VX-USB-Serial-PIO-Library), be careful when selecting a timer to configure. Do not use a timer that is already used for asynchronous USB communication (avoid TIM2 on CH32V1xx, V2xx and V3xx or TIM3 on CH32X03x), as this can mess with the USB's TX update rate.
 
 ## Installation
 ### Prequisites
@@ -37,8 +39,10 @@ Alternativly, you can also copy the library ```lib/CH32V_TIMER``` into any PIO p
 ```
 # Usage
 
-Import ```ch32v_timer.h```, then initialize a basic timer with ```basic_timer_init()```. The first argument is the Timer to select (either TCONF_TIM1, TCONF_TIM2, TCONF_TIM3 or TCONF_TIM4), followed by the frequency in Hz, wether to generate an interrupt for the timer (yes = TCONF_IRQ, no = TCONF_NO_IRQ) and optionally, specify a custom ``iCount`` for more precise frequencies. If an interrupt generation is desired, make sure to define an interrupt handler (e.g. ``void TIM3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));`` in ch32v20x_it.c).
-If you want to use the global systick to track timing of your code, initialize the systick counter with ``systick_init()`` and select either SYSTICK_SECONDS, SYSTICK_MILLIS or SYSTICK_MICROS to count time in seconds, milliseconds or microseconds respectively. ``systick_get()`` returns the current counter value.
+Import ```ch32v_timer.h```, then initialize a basic timer with ```basic_timer_init()```. The first argument is the Timer to select (either TCONF_TIM1, TCONF_TIM2, TCONF_TIM3 or TCONF_TIM4), followed by the frequency in Hz, wether to generate an interrupt for the timer (yes = TCONF_IRQ, no = TCONF_NO_IRQ, together with an optional argument ```func```, which points to the function to execute on interrupt) and optionally, specify a custom ``iCount`` for more precise frequencies.
+If you want to use the global systick to track timing of your code, initialize the systick counter with ``systick_init()`` and select either SYSTICK_SECONDS, SYSTICK_MILLIS, SYSTICK_MICROS or a custom timebase to count time in seconds, milliseconds, microseconds or arbitrary units respectively. ``systick_get()`` returns the current counter value.
+
+Check out the function descriptions for more details.
 
 Now you can compile and upload the project.
 
@@ -46,7 +50,7 @@ Now you can compile and upload the project.
 
 The available functions are:
 ```C++
-int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, uint16_t iCount = 254)    /* Initialize basic timer */
+int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (*func)(void) = NULL, uint16_t iCount = 254)    /* Initialize basic timer */
 
 void systick_init(int iPrecision);                                  /* Initialize systick conuter */
 uint64_t systick_get();                                             /* Get systick conuter */

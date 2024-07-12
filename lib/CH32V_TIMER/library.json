@@ -1,7 +1,7 @@
 {
     "name": "ch32v-timer",
-    "version": "0.1.0",
-    "description": "A library for initializing basic timers and reading systick global time on CH32V/X MCUs.",
+    "version": "0.1.2",
+    "description": "A library for initializing basic timers (with or without interrupts) and reading systick global time on CH32V/X MCUs.",
     "keywords": "ch32v, systick, timer",
     "repository":
     {

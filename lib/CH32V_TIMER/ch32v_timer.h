@@ -17,7 +17,7 @@ enum {
 	SYSTICK_MICROS
 };
 
-extern void systick_init(int iPrecision);
+extern void systick_init(uint32_t iPrecision);
 extern inline uint64_t systick_get();
 
 
@@ -34,13 +34,14 @@ enum {
 #define TCONF_NO_IRQ		0
 
 // Initializer function for basic Timer (also let iCount default to 254 if not specified)
-int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, uint16_t iCount);
+int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (*func)(void), uint16_t iCount);
 // input structure for variadic args
 typedef struct 
 {
     uint8_t iTimer;
     uint32_t iF_base;
 	uint8_t iIRQ;
+	void (*func)(void);
     uint16_t iCount;
 } init_timer_args;
 // placeholder for default args
@@ -56,6 +57,7 @@ int var_basic_timer_init(init_timer_args in);
  * @param   iF_base     Base frequency for Timer to trigger at when counter is filled up
  *                      WARNIGN: Due to integer divison, the actual frequency only roughly follows the specified one.
  * @param   iIRQ        Wether to generate Interrupt on counter fill up (TCONF_IRQ) or not (TCONF_NO_IRQ)
+ * @param   func        Pointer to function which shall be called upon timer up interrupt, must be return type void and parameter void. Declare or define before passing it here as function name.
  * @param   iCount      Base for scaling counter (Defaults to 254 to be compatible with PWM-Library's 8-Bit default iCount of 254, for more precise even frequencies, use even dividers of SystemCoreClock (multiples of 2))
  *
  * @return  Normally returns 0 on exit
