@@ -1,5 +1,5 @@
 # CH32VX-TIMER-PIO-Library
- A library for initializing basic timers and reading systick global time on CH32V/X MCUs.
+ A library for initializing basic timers and tracking global timing on CH32V/X MCUs.
 
 ## Note
 - The actual timer frequency might differ from the specified frequency, by various offsets, due to integer division.
@@ -40,11 +40,31 @@ Alternativly, you can also copy the library ```lib/CH32V_TIMER``` into any PIO p
 # Usage
 
 Import ```ch32v_timer.h```, then initialize a basic timer with ```basic_timer_init()```. The first argument is the Timer to select (either TCONF_TIM1, TCONF_TIM2, TCONF_TIM3 or TCONF_TIM4), followed by the frequency in Hz, wether to generate an interrupt for the timer (yes = TCONF_IRQ, no = TCONF_NO_IRQ, together with an optional argument ```func```, which points to the function to execute on interrupt) and optionally, specify a custom ``iCount`` for more precise frequencies.
-If you want to use the global systick to track timing of your code, initialize the systick counter with ``systick_init()`` and select either SYSTICK_SECONDS, SYSTICK_MILLIS, SYSTICK_MICROS or a custom timebase to count time in seconds, milliseconds, microseconds or arbitrary units respectively. ``systick_get()`` returns the current counter value.
-
-Check out the function descriptions for more details.
 
 Now you can compile and upload the project.
+
+## Methods for tracking global timing:
+
+### Method 1: Systick Timer
+
+If you want to use the global systick to track timing of your code, initialize the systick counter with ``systick_init()`` and select either SYSTICK_SECONDS, SYSTICK_MILLIS, SYSTICK_MICROS or a custom timebase to count time in seconds, milliseconds, microseconds or arbitrary units respectively. ``systick_get()`` returns the current counter value. This approach enables in the best resolution down to +/- 1us. However, it can be incompatible with certain libraries, especially if they use the ``Delay_Us()`` or ``Delay_Ms()`` functionality, which already utilizes the Systick Timer and can cause ``systick_get()`` to get stuck at a certain value. Due to this incompatibility, systick timing tracking is disabled by default, to enable it, uncomment line 12 ``#define GLOBAL_TIMING_USE_SYSYTICK`` in ``ch32v_timer.h``.
+
+Note: Recalling ``systick_init()`` periodically can maybe help in certain situations.
+Note: Using ``#define USB_TX_MODE USB_TX_SYNC`` in the USB serial library can maybe help in certain situations.
+
+Check out the function descriptions for more details. See the example in ``main.c``.
+
+### Method 2: Separate Timer ISR
+
+Using any other general or advanced timer for incrementing a global time counter is also a possible way of tracking timing. Use ``basic_timer_init()`` to initialize a timer for this purpose or reuse an existinig ISR. Depending on the MCU utilization with other interrupts and libraries, the highest possible timer frequency is 100kHz to 200kHz, resulting in a resolution of +/- 5us to 10us.
+
+Check out the function descriptions for more details. See the example in ``main.c``.
+
+### Method 3: Endless While-Loop with delay
+
+If you don't need to use the endless-while loop of your main function to do anything else, you can repeatidly call the ``Delay_Us()`` or ``Delay_Ms()`` method and increment a global time counter. This methods achieves usable time values down to a resolution of +/- 50us to 100us.
+
+Check out the function descriptions for more details. See the example in ``main.c``.
 
 ## Overview
 
@@ -59,8 +79,7 @@ uint64_t systick_get();                                             /* Get systi
 
 # Example
 
-The example in this PIO project shows how to configure Timer 3 as a basic timer that counts up, triggers an Interrupt and resets itself again, over and over. When it goes into the ISR, it measures the elapsed time since the last interrupt with the systick counter and prints that value out
-via UART.
+The example in this PIO project shows how to configure Timer 3 as a basic timer that counts up, triggers an Interrupt and resets itself again, over and over. When it goes into the ISR, it measures the elapsed time since the last interrupt with the systick counter and prints that value out via UART.
 
 At a frequency of roughly 1kHz, the systick measures roughly 1000 microseconds of elapsed time between the interrupts. When attention to a precise frequency is paid (as described above), timing can be precisly evaluated down to +/- 1us.
 

@@ -6,17 +6,21 @@ void (*f_body_tim2)(void);
 void (*f_body_tim3)(void);
 void (*f_body_tim4)(void);
 // TIMER ISR, placeholder declaration
-void TIM1_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+void TIM1_UP_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 #if !defined(CH32V20X) && !defined(CH32V10X) && !defined(CH32V30X)
+#if defined(CH32X035) || defined(CH32X033)
+    void TIM2_UP_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+#else
     void TIM2_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+#endif
 #endif
 #if !defined(CH32X035) && !defined(CH32X033)
     void TIM3_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
+    void TIM4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 #endif
-void TIM4_IRQHandler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
 
+#ifdef GLOBAL_TIMING_USE_SYSYTICK
 void SysTick_Handler(void) __attribute__((interrupt("WCH-Interrupt-fast")));
-
 uint64_t global_systick_counter = 0;
 
 /*********************************************************************
@@ -50,8 +54,11 @@ void systick_init(uint32_t iPrecision)
         break;
     }
     SysTick->CTLR = 0xF;
-
+    #if defined(CH32X035) || defined(CH32X033)
+    NVIC_SetPriority(SysTicK_IRQn, 15);
+    #else
     NVIC_SetPriority(SysTicK_IRQn, 1);
+    #endif
     NVIC_EnableIRQ(SysTicK_IRQn);
 }
 
@@ -79,6 +86,7 @@ uint64_t systick_get()
 {
     return global_systick_counter;
 }
+#endif
 
 /*********************************************************************
  * @fn      basic_timer_init_base
@@ -98,7 +106,8 @@ uint64_t systick_get()
 int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (*func)(void), uint16_t iCount)
 {
     // ---------- Initialize ----------
-    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure={0};
+    TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStructure = {0};
+    NVIC_InitTypeDef NVIC_InitStructure = {0};
     // ---------- Initialize Timer ----------
     TIM_TimeBaseInitStructure.TIM_Period = iCount;
 	TIM_TimeBaseInitStructure.TIM_Prescaler = SystemCoreClock / iCount / iF_base;   // Rough frequency match, only integer prescaler possible: 96000000 / ( 96000000 / 4 / 1000) / 5
@@ -106,37 +115,47 @@ int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (
 	TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
     switch (iTimer)
     {
-        case TCONF_TIM1:
+        case TCONF_TIM1:    // TIM1 is always an advanced timer, independent of MCU-Series
             RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
             TIM_TimeBaseInit( TIM1, &TIM_TimeBaseInitStructure);
             TIM_SelectOutputTrigger(TIM1, TIM_TRGOSource_Update);       // Enable self-resetting TRGO-Event when no PWM configured
             if (iIRQ && func != NULL && *func != NULL)
             {
-                TIM_ClearFlag( TIM1, TIM_FLAG_Update );
-                TIM_ITConfig( TIM1, TIM_IT_Update, ENABLE );
-                NVIC_EnableIRQ( TIM1_UP_IRQn );
+                NVIC_InitStructure.NVIC_IRQChannel = TIM1_UP_IRQn;
+                NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+                NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+                NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+                NVIC_Init(&NVIC_InitStructure);
+                TIM_ClearFlag(TIM1, TIM_FLAG_Update);
+                TIM_ITConfig(TIM1, TIM_IT_Update, ENABLE);
                 f_body_tim1 = func;
             }
             TIM_Cmd(TIM1, ENABLE);
             break;
-        case TCONF_TIM2:
+        case TCONF_TIM2:    // TIM2 is an advanced timer on the CH32V03X Series (used for async USB TX by default on other series)
             RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2 , ENABLE);
             TIM_TimeBaseInit( TIM2, &TIM_TimeBaseInitStructure);
             TIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);       // Enable self-resetting TRGO-Event when no PWM configured
             if (iIRQ && func != NULL && *func != NULL)
             {
-                TIM_ClearFlag( TIM2, TIM_FLAG_Update );
-                TIM_ITConfig( TIM2, TIM_IT_Update, ENABLE );
                 #if defined(CH32X035) || defined(CH32X033)
-                    NVIC_EnableIRQ( TIM2_UP_IRQn );
+                    NVIC_InitStructure.NVIC_IRQChannel = TIM2_UP_IRQn;
+                    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+                    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+                    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+                    NVIC_Init(&NVIC_InitStructure);
+                    TIM_ClearFlag(TIM2, TIM_FLAG_Update);
+                    TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
                 #else
+                    TIM_ClearFlag( TIM2, TIM_FLAG_Update );
+                    TIM_ITConfig( TIM2, TIM_IT_Update, ENABLE );
                     NVIC_EnableIRQ( TIM2_IRQn );
                 #endif
                 f_body_tim2 = func;
             }
             TIM_Cmd(TIM2, ENABLE);
             break;
-        case TCONF_TIM3:
+        case TCONF_TIM3:    // TIM3 is always a regular timer (on the CH32V03X Series used for async USB TX by default)
             RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3 , ENABLE);
             TIM_TimeBaseInit( TIM3, &TIM_TimeBaseInitStructure);
             TIM_SelectOutputTrigger(TIM3, TIM_TRGOSource_Update);       // Enable self-resetting TRGO-Event when no PWM configured
@@ -149,7 +168,8 @@ int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (
             }
             TIM_Cmd(TIM3, ENABLE);
             break;
-        case TCONF_TIM4:
+        #if !defined(CH32X035) && !defined(CH32X033)
+        case TCONF_TIM4:    // TIM3 is always a regular timer (not available on CH32V03X Series)
             RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4 , ENABLE);
             TIM_TimeBaseInit( TIM4, &TIM_TimeBaseInitStructure);
             TIM_SelectOutputTrigger(TIM4, TIM_TRGOSource_Update);       // Enable self-resetting TRGO-Event when no PWM configured
@@ -162,6 +182,7 @@ int basic_timer_init_base(uint8_t iTimer, uint32_t iF_base, uint8_t iIRQ, void (
             }
             TIM_Cmd(TIM4, ENABLE);
             break;
+        #endif
     }
     return 0;
 }
@@ -174,20 +195,41 @@ int var_basic_timer_init(init_timer_args in)
 }
 
 /*********************************************************************
- * @fn      TIM1_IRQHandler
+ * @fn      TIM1_UP_IRQHandler
  *
  * @brief   This function handles TIM1 up interrupt.
  *
  * @return  none
  */
-void TIM1_IRQHandler( void )
+void TIM1_UP_IRQHandler( void )
 {
-    (*f_body_tim1)();
+    if (TIM_GetITStatus(TIM1, TIM_IT_Update))
+    {
+        (*f_body_tim1)();
+    }
     /* clear status */
-    TIM1->INTFR = (uint16_t)~TIM_IT_Update;
+    TIM_ClearITPendingBit(TIM1, TIM_IT_Update);
 }
 
 #if !defined(CH32V20X) && !defined(CH32V10X) && !defined(CH32V30X)
+#if defined(CH32X035) || defined(CH32X033)
+    /*********************************************************************
+     * @fn      TIM2_UP_IRQHandler
+     *
+     * @brief   This function handles TIM2 up interrupt.
+     *
+     * @return  none
+     */
+    void TIM2_UP_IRQHandler( void )
+    {
+        if (TIM_GetITStatus(TIM2, TIM_IT_Update))
+        {
+            (*f_body_tim2)();
+        }
+        /* clear status */
+        TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+    }
+#else
     /*********************************************************************
      * @fn      TIM2_IRQHandler
      *
@@ -201,6 +243,7 @@ void TIM1_IRQHandler( void )
         /* clear status */
         TIM2->INTFR = (uint16_t)~TIM_IT_Update;
     }
+#endif
 #endif
 
 #if !defined(CH32X035) && !defined(CH32X033)
@@ -219,6 +262,7 @@ void TIM1_IRQHandler( void )
     }
 #endif
 
+#if !defined(CH32X035) && !defined(CH32X033)
 /*********************************************************************
  * @fn      TIM4_IRQHandler
  *
@@ -232,3 +276,4 @@ void TIM4_IRQHandler( void )
     /* clear status */
     TIM4->INTFR = (uint16_t)~TIM_IT_Update;
 }
+#endif

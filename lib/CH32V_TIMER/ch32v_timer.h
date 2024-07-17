@@ -9,6 +9,7 @@ extern "C" {
 
 // ---------- Systick to measure MCU time ----------
 
+//#define GLOBAL_TIMING_USE_SYSYTICK
 // Global System Timebase Precision (increment global systick counter every second, millisecond or microsecond)
 // Higher precision means more counter increment ISR calls
 enum {
@@ -17,9 +18,10 @@ enum {
 	SYSTICK_MICROS
 };
 
+#ifdef GLOBAL_TIMING_USE_SYSYTICK
 extern void systick_init(uint32_t iPrecision);
 extern inline uint64_t systick_get();
-
+#endif
 
 // ---------- Basic Timer Initializer (No PWM, only Trigger source for ADC or IRQ) ----------
 
